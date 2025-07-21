@@ -102,19 +102,39 @@ const Spinner = styled.span`
     to { transform: translateY(-50%) rotate(360deg); }
   }
 `;
+const LinkRow = styled.div`
+  width: 100%;
+  text-align: center;
+  margin-top: 1.2rem;
+  font-size: 1rem;
+`;
+const SwitchLink = styled.span`
+  color: #1976d2;
+  cursor: pointer;
+  font-weight: 600;
+  margin-left: 0.3rem;
+  &:hover { text-decoration: underline; }
+`;
 
-const AuthModal = ({ mode, onClose, onSubmit, error, loading, asPage = false }) => {
-  const [form, setForm] = useState({ username: '', password: '' });
+const AuthModal = ({ mode, onClose, onSubmit, error, loading, asPage = false, registerLabel, onSwitchMode }) => {
+  const [form, setForm] = useState({ username: '', password: '', confirm: '' });
   const [showPassword, setShowPassword] = useState(false);
+  const [localError, setLocalError] = useState(null);
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
   const handleSubmit = (e) => {
     e.preventDefault();
+    setLocalError(null);
+    if (mode === 'register' && form.password !== form.confirm) {
+      setLocalError('Passwords do not match.');
+      return;
+    }
     onSubmit(form);
   };
   const content = (
     <Modal>
-      <Title>{mode === 'login' ? 'Login' : 'Register'}</Title>
+      <Title>{mode === 'login' ? 'Login' : (registerLabel || 'Register')}</Title>
       {error && <ErrorMsg>{error}</ErrorMsg>}
+      {localError && <ErrorMsg>{localError}</ErrorMsg>}
       <form onSubmit={handleSubmit} style={{ width: '100%' }}>
         <Input
           name="username"
@@ -134,6 +154,17 @@ const AuthModal = ({ mode, onClose, onSubmit, error, loading, asPage = false }) 
           required
           disabled={loading}
         />
+        {mode === 'register' && (
+          <Input
+            name="confirm"
+            type={showPassword ? 'text' : 'password'}
+            placeholder="Confirm Password"
+            value={form.confirm}
+            onChange={handleChange}
+            required
+            disabled={loading}
+          />
+        )}
         <ShowPassword>
           <input
             type="checkbox"
@@ -147,10 +178,23 @@ const AuthModal = ({ mode, onClose, onSubmit, error, loading, asPage = false }) 
           {onClose && <Button type="button" onClick={onClose} disabled={loading}>Cancel</Button>}
           <Button type="submit" disabled={loading}>
             {loading && <Spinner />}
-            {mode === 'login' ? 'Login' : 'Register'}
+            {mode === 'login' ? 'Login' : (registerLabel || 'Register')}
           </Button>
         </ButtonRow>
       </form>
+      <LinkRow>
+        {mode === 'login' ? (
+          <>
+            Don&apos;t have an account?
+            <SwitchLink onClick={() => onSwitchMode && onSwitchMode('register')}>Sign up</SwitchLink>
+          </>
+        ) : (
+          <>
+            Already have an account?
+            <SwitchLink onClick={() => onSwitchMode && onSwitchMode('login')}>Login</SwitchLink>
+          </>
+        )}
+      </LinkRow>
     </Modal>
   );
   if (asPage) {

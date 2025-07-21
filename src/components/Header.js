@@ -124,7 +124,7 @@ const Header = ({ themeMode, toggleTheme, isLoggedIn, onLogin, onRegister, onLog
         ) : (
           <>
             <ActionBtn theme={theme} onClick={onLogin}>Login</ActionBtn>
-            <ActionBtn theme={theme} onClick={onRegister}>Register</ActionBtn>
+            <ActionBtn theme={theme} onClick={onRegister}>Sign Up</ActionBtn>
           </>
         )}
       </Actions>

@@ -11,6 +11,7 @@ import Toast from './Toast';
 import AuthModal from './AuthModal';
 import LandingPage from './LandingPage';
 import SongManagerPage from './SongManagerPage';
+import axios from 'axios';
 
 const AppWrapper = styled.div`
   min-height: 100vh;
@@ -66,6 +67,15 @@ const App = ({ themeMode, toggleTheme }) => {
     dispatch(fetchSongs());
   }, [dispatch]);
 
+  // On app load, set token if present
+  React.useEffect(() => {
+    const token = localStorage.getItem('authToken');
+    if (token) {
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      setIsLoggedIn(true);
+    }
+  }, []);
+
   // Pagination logic
   const totalPages = Math.ceil(songs.length / SONGS_PER_PAGE) || 1;
   const paginatedSongs = songs.slice(
@@ -112,20 +122,46 @@ const App = ({ themeMode, toggleTheme }) => {
   const handleLogout = () => {
     setIsLoggedIn(false);
     setToast({ message: 'Logged out!', type: 'success' });
+    localStorage.removeItem('authToken');
+    delete axios.defaults.headers.common['Authorization'];
   };
-  const handleAuthSubmit = (form) => {
+  const handleAuthSubmit = async (form) => {
     setAuthError(null);
     if (form.username.length < 3 || form.password.length < 3) {
       setAuthError('Username and password must be at least 3 characters.');
       return;
     }
     setAuthLoading(true);
-    setTimeout(() => {
-      setIsLoggedIn(true);
-      setToast({ message: `${authModal === 'login' ? 'Logged in' : 'Registered and logged in'} as ${form.username}!`, type: 'success' });
-      setAuthModal(null);
+    try {
+      let url, successMsg;
+      if (authModal === 'login') {
+        url = '/api/auth/login/';
+        successMsg = `Logged in as ${form.username}!`;
+      } else {
+        url = '/api/auth/register/';
+        successMsg = `Registered and logged in as ${form.username}!`;
+      }
+      const res = await axios.post(url, form);
+      // Accept either { token: ... } or { access: ... }
+      const token = res.data.token || res.data.access;
+      if (token) {
+        localStorage.setItem('authToken', token);
+        axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+        setIsLoggedIn(true);
+        setToast({ message: successMsg, type: 'success' });
+        setAuthModal(null);
+      } else {
+        setAuthError('Invalid response from server.');
+      }
+    } catch (err) {
+      setAuthError(
+        err.response?.data?.detail ||
+        err.response?.data?.error ||
+        'Authentication failed. Please try again.'
+      );
+    } finally {
       setAuthLoading(false);
-    }, 1200);
+    }
   };
 
   return (
@@ -140,6 +176,8 @@ const App = ({ themeMode, toggleTheme }) => {
           onSubmit={handleAuthSubmit}
           error={authError}
           loading={authLoading}
+          registerLabel="Sign Up"
+          onSwitchMode={mode => setAuthModal(mode)}
         />
       )}
       <Header

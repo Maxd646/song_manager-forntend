@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import styled from '@emotion/styled';
 import { motion, AnimatePresence } from 'framer-motion';
 import SongForm from './SongForm';
-import { FaSearch, FaPlus, FaEdit, FaTrash, FaUserCircle, FaMusic, FaHeadphones, FaVideo } from 'react-icons/fa';
+import { FaSearch, FaPlus, FaEdit, FaTrash, FaUserCircle, FaMusic, FaHeadphones, FaVideo, FaCheck } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import axios from 'axios';
@@ -187,18 +187,24 @@ const FloatingAddBtn = styled(AddBtn)`
     display: flex;
   }
 `;
+const GridContainer = styled.div`
+  width: 100%;
+  max-width: 100vw;
+  margin: 0 auto;
+  overflow-x: auto;
+  padding: 0 1vw;
+  white-space: nowrap;
+`;
 const Grid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(3, 320px);
+  display: flex;
+  flex-direction: row;
   gap: 2rem;
   width: max-content;
-  min-width: 100%;
-  margin: 2.5rem 0 1rem 0;
-  padding: 0;
   box-sizing: border-box;
-  overflow-x: auto;
-  justify-items: start;
-  margin-left: 0;
+  @media (max-width: 700px) {
+    flex-direction: column;
+    width: 100%;
+  }
 `;
 
 const SnakeSeparator = styled.div`
@@ -217,12 +223,21 @@ const Card = styled(motion.div)`
   align-items: flex-start;
   position: relative;
   border: 1px solid rgba(67,160,71,0.10);
-  transition: box-shadow 0.18s, transform 0.18s;
+  transition: box-shadow 0.18s, transform 0.18s, border 0.18s, background 0.18s;
   backdrop-filter: blur(6px);
+  width: 320px;
+  min-width: 320px;
+  max-width: 320px;
+  height: 340px;
+  min-height: 340px;
+  box-sizing: border-box;
+  justify-content: flex-start;
+  overflow: hidden;
   &:hover {
-    box-shadow: 0 4px 16px rgba(67,160,71,0.13);
-    transform: translateY(-2px) scale(1.02);
-    background: rgba(255,255,255,0.95);
+    box-shadow: 0 8px 32px rgba(67,160,71,0.18), 0 2px 16px rgba(25, 118, 210, 0.13);
+    transform: translateY(-4px) scale(1.03) rotate(-0.5deg);
+    background: linear-gradient(120deg, #f4f6fa 0%, #e3f2fd 100%);
+    border: 2.5px solid #43a047;
   }
 `;
 const CardMedia = styled.div`
@@ -338,6 +353,8 @@ const SongManagerPage = (props) => {
   const [error, setError] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [modalEditSong, setModalEditSong] = useState(null);
+  // 1. Add state for selected songs
+  const [selected, setSelected] = useState([]);
 
   const API_BASE_URL = 'http://localhost:8000/api/songs/';
 
@@ -390,6 +407,41 @@ const SongManagerPage = (props) => {
       .then(() => fetchSongs())
       .catch(() => setError('Failed to delete song'))
       .finally(() => setLoading(false));
+  };
+
+  // 2. Handler for selecting/deselecting a song
+  const toggleSelect = (id) => {
+    setSelected((prev) =>
+      prev.includes(id) ? prev.filter((sid) => sid !== id) : [...prev, id]
+    );
+  };
+  const clearSelection = () => setSelected([]);
+
+  // 3. Handler for batch delete
+  const handleBatchDelete = () => {
+    if (!window.confirm(`Delete ${selected.length} song(s)?`)) return;
+    setLoading(true);
+    Promise.all(selected.map(id => axios.delete(`${API_BASE_URL}${id}/`)))
+      .then(() => fetchSongs())
+      .catch(() => setError('Failed to delete selected songs'))
+      .finally(() => {
+        setLoading(false);
+        clearSelection();
+      });
+  };
+
+  // 4. Handler for batch update (placeholder, you can customize)
+  const handleBatchUpdate = () => {
+    // Example: just show a toast for now
+    toast(`Update for ${selected.length} song(s) coming soon!`);
+  };
+
+  // 5. Handler for edit (only if one selected)
+  const handleEditSelected = () => {
+    if (selected.length === 1) {
+      const song = songs.find(s => s.id === selected[0]);
+      openEditModal(song);
+    }
   };
 
   // Modal handlers
@@ -455,7 +507,6 @@ const SongManagerPage = (props) => {
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
-          <GlowingAddBtn onClick={openAddModal}><FaPlus /> Add Song</GlowingAddBtn>
         </GlassSearchBar>
       </HeaderWrapper>
       <SnakeSeparator>
@@ -463,44 +514,139 @@ const SongManagerPage = (props) => {
           <path d="M0 20 Q 75 0, 150 20 T 300 20 T 450 20 T 600 20 T 750 20 T 900 20" stroke="#1976d2" strokeWidth="4" fill="none" />
         </svg>
       </SnakeSeparator>
+      {filteredSongs.length === 0 && !loading && (
+        <EmptyState>
+          <motion.div
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ duration: 0.7 }}
+            style={{ marginBottom: 24 }}
+          >
+            <FaMusic style={{ fontSize: 64, color: '#1976d2', opacity: 0.18 }} />
+          </motion.div>
+          <div style={{ fontSize: 22, fontWeight: 700, marginBottom: 8 }}>
+            No songs found
+          </div>
+          <div style={{ color: '#555', marginBottom: 18 }}>
+            Start by adding your first song!
+          </div>
+          <motion.button
+            whileHover={{ scale: 1.08 }}
+            whileTap={{ scale: 0.97 }}
+            onClick={openAddModal}
+            style={{
+              background: 'linear-gradient(90deg, #43a047 60%, #1976d2 100%)',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '2rem',
+              padding: '0.9rem 2.2rem',
+              fontSize: 18,
+              fontWeight: 700,
+              boxShadow: '0 2px 12px #1976d222',
+              cursor: 'pointer',
+            }}
+          >
+            <FaPlus style={{ marginRight: 8 }} /> Add Song
+          </motion.button>
+        </EmptyState>
+      )}
       {rows.map((row, rowIndex) => (
         <React.Fragment key={rowIndex}>
-          <Grid>
-            {row.map((song, i) => (
-              <Card
-                key={song.id || i}
-                initial={{ opacity: 0, y: 30 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 30 }}
-                transition={{ duration: 0.4 }}
-                whileHover={{ scale: 1.05, rotate: 1 }}
-                style={{ boxShadow: '0 8px 32px #1976d222', border: '1.5px solid #1976d2', background: 'rgba(255,255,255,0.96)' }}
-              >
-                <CardMedia>
-                  {song.audio_file && (
-                    <audio controls style={{ width: '100%' }}>
-                      <source src={song.audio_file.startsWith('http') ? song.audio_file : MEDIA_BASE_URL + song.audio_file} type="audio/mpeg" />
-                      Your browser does not support the audio element.
-                    </audio>
+          <GridContainer>
+            <Grid>
+              {row.map((song, i) => (
+                <Card
+                  key={song.id || i}
+                  initial={{ opacity: 0, y: 30 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 30 }}
+                  transition={{ duration: 0.4, delay: i * 0.08 }}
+                  whileHover={{ scale: 1.04, background: 'linear-gradient(120deg, #e3f2fd 0%, #f4f6fa 60%, #e3f2fd 100%)' }}
+                  style={{
+                    boxShadow: selected.includes(song.id)
+                      ? '0 0 0 4px #1976d2aa, 0 8px 32px #1976d222'
+                      : '0 8px 32px #1976d222',
+                    border: selected.includes(song.id)
+                      ? '2.5px solid #1976d2'
+                      : '1.5px solid #1976d2',
+                    background: selected.includes(song.id)
+                      ? 'rgba(25, 118, 210, 0.10)'
+                      : 'rgba(255,255,255,0.96)',
+                    position: 'relative',
+                    overflow: 'hidden',
+                  }}
+                >
+                  {/* Animated checkmark overlay */}
+                  {selected.includes(song.id) && (
+                    <motion.div
+                      initial={{ scale: 0, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      exit={{ scale: 0, opacity: 0 }}
+                      transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+                      style={{
+                        position: 'absolute',
+                        top: 10,
+                        right: 10,
+                        zIndex: 3,
+                        background: 'linear-gradient(90deg, #43a047 60%, #1976d2 100%)',
+                        borderRadius: '50%',
+                        width: 32,
+                        height: 32,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        boxShadow: '0 2px 8px #1976d222',
+                      }}
+                    >
+                      <FaCheck style={{ color: '#fff', fontSize: 18 }} />
+                    </motion.div>
                   )}
-                  {song.video_file && (
-                    <video controls style={{ width: '100%', borderRadius: '0.7rem' }} height={120}>
-                      <source src={song.video_file.startsWith('http') ? song.video_file : MEDIA_BASE_URL + song.video_file} type="video/mp4" />
-                      Your browser does not support the video tag.
-                    </video>
-                  )}
-                </CardMedia>
-                <CardTitle>{song.title}</CardTitle>
-                <CardMeta><FaMusic style={{ color: '#1976d2', marginRight: 4 }} /> <b>Artist:</b> {song.artist}</CardMeta>
-                <CardMeta><b>Album:</b> {song.album || '-'} <FaHeadphones style={{ color: '#43a047', marginLeft: 4 }} /></CardMeta>
-                <CardMeta><b>Year:</b> {song.year || '-'} <FaVideo style={{ color: '#ffd600', marginLeft: 4 }} /></CardMeta>
-                <CardActions>
-                  <ActionBtn onClick={() => openEditModal(song)}><FaEdit /> Edit</ActionBtn>
-                  <ActionBtn onClick={() => handleDeleteSong(song.id)}><FaTrash /> Delete</ActionBtn>
-                </CardActions>
-              </Card>
-            ))}
-          </Grid>
+                  {/* Selection Checkbox */}
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.7 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ duration: 0.2 }}
+                    style={{
+                      position: 'absolute',
+                      top: 12,
+                      left: 12,
+                      zIndex: 2,
+                      background: 'rgba(255,255,255,0.85)',
+                      borderRadius: '50%',
+                      boxShadow: '0 2px 8px #1976d222',
+                      padding: 2,
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selected.includes(song.id)}
+                      onChange={() => toggleSelect(song.id)}
+                      style={{ width: 20, height: 20 }}
+                    />
+                  </motion.div>
+                  <CardMedia>
+                    {song.audio_file && (
+                      <audio controls style={{ width: '100%' }}>
+                        <source src={song.audio_file.startsWith('http') ? song.audio_file : MEDIA_BASE_URL + song.audio_file} type="audio/mpeg" />
+                        Your browser does not support the audio element.
+                      </audio>
+                    )}
+                    {song.video_file && (
+                      <video controls style={{ width: '100%', borderRadius: '0.7rem' }} height={120}>
+                        <source src={song.video_file.startsWith('http') ? song.video_file : MEDIA_BASE_URL + song.video_file} type="video/mp4" />
+                        Your browser does not support the video tag.
+                      </video>
+                    )}
+                  </CardMedia>
+                  <CardTitle>{song.title}</CardTitle>
+                  <CardMeta><FaMusic style={{ color: '#1976d2', marginRight: 4 }} /> <b>Artist:</b> {song.artist}</CardMeta>
+                  <CardMeta><b>Album:</b> {song.album || '-'} <FaHeadphones style={{ color: '#43a047', marginLeft: 4 }} /></CardMeta>
+                  <CardMeta><b>Year:</b> {song.year || '-'} <FaVideo style={{ color: '#ffd600', marginLeft: 4 }} /></CardMeta>
+                  {/* Hide per-card actions if selection is active */}
+                </Card>
+              ))}
+            </Grid>
+          </GridContainer>
           {rowIndex < rows.length - 1 && (
             <SnakeSeparator>
               <svg width="100%" height="40" viewBox="0 0 900 40" fill="none" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
@@ -515,7 +661,129 @@ const SongManagerPage = (props) => {
         <span>Page {page} of {totalPages}</span>
         <PageBtn onClick={() => setPage(page + 1)} disabled={page === totalPages}>Next &gt;</PageBtn>
       </Pagination>
-      <FloatingAddBtn onClick={openAddModal}><FaPlus /> Add Song</FloatingAddBtn>
+      {/* Floating Action Bar for selection */}
+      <AnimatePresence>
+        {selected.length > 0 && (
+          <motion.div
+            initial={{ y: 80, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 80, opacity: 0 }}
+            transition={{ duration: 0.35 }}
+            style={{
+              position: 'fixed',
+              bottom: 0,
+              left: 0,
+              width: '100vw',
+              zIndex: 2000,
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              padding: '1.2rem 0',
+              background: 'rgba(255,255,255,0.92)',
+              boxShadow: '0 -4px 32px #1976d222',
+              borderTop: '2.5px solid #1976d2',
+              backdropFilter: 'blur(18px)',
+              gap: '2rem',
+              borderRadius: '1.5rem 1.5rem 0 0',
+              overflow: 'hidden',
+            }}
+          >
+            {/* Shimmer overlay */}
+            <motion.div
+              animate={{ x: [-200, 1200] }}
+              transition={{ duration: 2.5, repeat: Infinity, ease: 'linear' }}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: 180,
+                height: '100%',
+                background: 'linear-gradient(120deg, rgba(67,160,71,0.08) 0%, rgba(25,118,210,0.13) 100%)',
+                filter: 'blur(12px)',
+                opacity: 0.5,
+                pointerEvents: 'none',
+                zIndex: 1,
+              }}
+            />
+            <div style={{ display: 'flex', gap: '2rem', alignItems: 'center', zIndex: 2 }}>
+              <div title="Delete selected">
+                <ActionBtn onClick={handleBatchDelete}><FaTrash style={{ fontSize: 22 }} /> Delete ({selected.length})</ActionBtn>
+              </div>
+              <div title="Batch update (coming soon)">
+                <ActionBtn onClick={handleBatchUpdate}><FaHeadphones style={{ fontSize: 22 }} /> Update</ActionBtn>
+              </div>
+              <div title={selected.length === 1 ? "Edit selected" : "Select one to edit"}>
+                <ActionBtn
+                  onClick={handleEditSelected}
+                  disabled={selected.length !== 1}
+                  style={{ opacity: selected.length === 1 ? 1 : 0.5 }}
+                >
+                  <FaEdit style={{ fontSize: 22 }} /> Edit
+                </ActionBtn>
+              </div>
+              <div title="Clear selection">
+                <ActionBtn onClick={clearSelection} style={{ background: '#ccc', color: '#222' }}>Cancel</ActionBtn>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      {/* FAB for Add Song (always visible, bottom right) */}
+      <motion.div
+        initial={{ scale: 0.8, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.8, opacity: 0 }}
+        transition={{ duration: 0.35 }}
+        style={{
+          position: 'fixed',
+          bottom: '2.2rem',
+          right: '2.2rem',
+          zIndex: 2100,
+          display: selected.length > 0 ? 'none' : 'flex',
+          flexDirection: 'column',
+          alignItems: 'flex-end',
+        }}
+      >
+        <div title="Add a new song">
+          <motion.button
+            animate={{
+              boxShadow: [
+                '0 0 0 0 #43a04755',
+                '0 0 0 12px #43a04711',
+                '0 0 0 0 #43a04755',
+              ],
+              scale: [1, 1.08, 1],
+            }}
+            transition={{
+              duration: 2.2,
+              repeat: Infinity,
+              repeatType: 'loop',
+              ease: 'easeInOut',
+            }}
+            whileHover={{ scale: 1.15, boxShadow: '0 0 0 16px #43a04733, 0 0 32px 4px #1976d244' }}
+            whileTap={{ scale: 0.97 }}
+            onClick={openAddModal}
+            style={{
+              background: 'linear-gradient(90deg, #43a047 60%, #1976d2 100%)',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '50%',
+              width: 68,
+              height: 68,
+              fontSize: 32,
+              boxShadow: '0 8px 32px rgba(25, 118, 210, 0.18)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              outline: 'none',
+              transition: 'background 0.22s, box-shadow 0.22s',
+            }}
+          >
+            <FaPlus />
+          </motion.button>
+        </div>
+      </motion.div>
       <AnimatePresence>
         {modalOpen && (
           <ModalOverlay

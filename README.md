@@ -20,7 +20,7 @@ This project is a full-featured frontend for managing songs, artists, and playli
 
 - Some UI components, layout suggestions, and code snippets were generated or refactored with the help of AI (ChatGPT/Copilot), especially for:
   - Responsive grid and card layout
-  - SVG snake line separator
+  - SVG snake line separator and movtion
 -
 
 ## Manual Implementation & Problem-Solving
